@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 每周一 06:00 UTC = 北京时间 14:00
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups
+      - run: uv run pytest -q
+
+  deps:
+    # 只在定时触发时检查依赖漂移：代码没变，上游可能变了。
+    # push CI 永远抓不到这一类问题。
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: 检查 uv.lock 是否有可用更新
+        run: |
+          uv lock --upgrade
+          if git diff --quiet uv.lock; then
+            echo "依赖无变化"
+          else
+            echo "::warning::uv.lock 有可用更新"
+            git diff --stat uv.lock
+          fi

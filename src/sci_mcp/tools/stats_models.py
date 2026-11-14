@@ -14,17 +14,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.stattools import adfuller
 
 from ..core import err, load_array, ok, output_dir
 
+# pandas + statsmodels (~0.7s combined) are imported inside the tools that use
+# them so discovering this module costs nothing at server startup.
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import pandas as pd
 
 
 # BRIEF section 11: never return more than 2000 numeric points in one array.
@@ -35,13 +34,15 @@ _MAX_FORECAST_STEPS = 10_000
 
 _OUTPUT_COUNTER = itertools.count(1)
 
-_FAMILIES: dict[str, Any] = {
-    "gaussian": sm.families.Gaussian,
-    "binomial": sm.families.Binomial,
-    "poisson": sm.families.Poisson,
-    "gamma": sm.families.Gamma,
-    "inverse_gaussian": sm.families.InverseGaussian,
-    "negativebinomial": sm.families.NegativeBinomial,
+# Public family name -> attribute on ``statsmodels.api.families``. Stored as
+# strings so this table needs no statsmodels import at module load.
+_FAMILIES: dict[str, str] = {
+    "gaussian": "Gaussian",
+    "binomial": "Binomial",
+    "poisson": "Poisson",
+    "gamma": "Gamma",
+    "inverse_gaussian": "InverseGaussian",
+    "negativebinomial": "NegativeBinomial",
 }
 
 _DECOMPOSE_MODELS = ("additive", "multiplicative")
@@ -144,6 +145,8 @@ def _resolve_input_path(raw: Any) -> Path:
 
 def _load_glm_data(data: Any) -> pd.DataFrame:
     """Build a DataFrame from a ``{column: list}`` mapping or ``@<path>.csv``."""
+    import pandas as pd
+
     if isinstance(data, dict):
         if not data:
             raise ValueError("data must not be empty")
@@ -210,8 +213,8 @@ def glm(
         if not isinstance(family, str):
             return err("glm failed: family must be a string")
         family_name = family.strip().lower()
-        family_class = _FAMILIES.get(family_name)
-        if family_class is None:
+        family_attr = _FAMILIES.get(family_name)
+        if family_attr is None:
             return err(
                 "glm failed: unknown family "
                 f"{family!r}; expected one of "
@@ -222,6 +225,11 @@ def glm(
             return err("glm failed: formula must be a non-empty string")
 
         frame = _load_glm_data(data)
+
+        import statsmodels.api as sm
+        import statsmodels.formula.api as smf
+
+        family_class = getattr(sm.families, family_attr)
 
         with warnings.catch_warnings():
             # NegativeBinomial warns about its default alpha and some link
@@ -324,6 +332,8 @@ def arima(
         if not math.isfinite(alpha) or not (0.0 < alpha < 1.0):
             return err("arima failed: conf_alpha must be in (0, 1)")
 
+        from statsmodels.tsa.arima.model import ARIMA
+
         result = ARIMA(
             values, order=ar_order, seasonal_order=seasonal
         ).fit()
@@ -403,6 +413,8 @@ def time_series_decompose(
                 "time_series_decompose failed: model must be 'additive' or "
                 "'multiplicative'"
             )
+
+        from statsmodels.tsa.seasonal import seasonal_decompose
 
         decomposition = seasonal_decompose(
             values, model=model_name, period=cycles
@@ -486,6 +498,8 @@ def stationarity_test(
                 "stationarity_test failed: autolag must be 'AIC', 'BIC', "
                 "'t-stat' or None"
             )
+
+        from statsmodels.tsa.stattools import adfuller
 
         adf_result = adfuller(
             values,

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pywt
 from mcp.server.mcpserver import MCPServer
 
 from ..core import err, load_array, ok, output_dir
+
+# PyWavelets depends on scipy and is only needed once a wavelet tool is called.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    import pywt
 
 # BRIEF section 11: never return more than 2000 numeric points in one array.
 _MAX_POINTS = 2000
@@ -62,6 +65,8 @@ def _new_output_path(prefix: str, suffix: str) -> Path:
 
 def _resolve_wavelet(wavelet: Any) -> pywt.Wavelet:
     """Validate a wavelet name and return the pywt.Wavelet instance."""
+    import pywt
+
     if not isinstance(wavelet, str) or not wavelet.strip():
         raise ValueError("wavelet must be a non-empty wavelet name string")
     try:
@@ -72,6 +77,8 @@ def _resolve_wavelet(wavelet: Any) -> pywt.Wavelet:
 
 def _resolve_level(level: Any, samples: np.ndarray, wavelet: pywt.Wavelet) -> int:
     """Validate an explicit decomposition level or derive the maximum one."""
+    import pywt
+
     maximum = int(pywt.dwt_max_level(int(samples.size), wavelet.dec_len))
     if level is None:
         return maximum
@@ -123,6 +130,8 @@ def wavelet_transform(
     short preview of each level.
     """
     try:
+        import pywt
+
         wave = _resolve_wavelet(wavelet)
         samples = _coerce_series(signal, "signal")
         selected_level = _resolve_level(level, samples, wave)
@@ -168,6 +177,8 @@ def wavelet_denoise(
     is used with ``sigma`` estimated from the finest detail coefficients via MAD.
     """
     try:
+        import pywt
+
         wave = _resolve_wavelet(wavelet)
         samples = _coerce_series(signal, "signal")
         selected_level = _resolve_level(level, samples, wave)

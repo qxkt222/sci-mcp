@@ -3,15 +3,35 @@
 from __future__ import annotations
 
 import re
-
-import pint
-from mcp.server.mcpserver import MCPServer
-from scipy.constants import physical_constants as _PHYSICAL_CONSTANTS
+from typing import TYPE_CHECKING, Any
 
 from ..core import err, ok, to_jsonable
 
-# One registry per process: creating a UnitRegistry loads the unit definition file.
-_ureg = pint.UnitRegistry()
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.mcpserver import MCPServer
+
+# pint and scipy.constants are only needed by these three tools. Both are
+# imported lazily: creating a pint UnitRegistry parses the unit definition file
+# and costs ~150ms at startup.
+_UREGISTRY: Any = None
+
+
+def _ureg() -> Any:
+    """Return the process-wide pint UnitRegistry, creating it on first use."""
+    global _UREGISTRY
+    if _UREGISTRY is None:
+        import pint
+
+        _UREGISTRY = pint.UnitRegistry()
+    return _UREGISTRY
+
+
+def _physical_constants() -> dict:
+    """Return scipy's physical_constants table, importing scipy on first use."""
+    from scipy.constants import physical_constants
+
+    return physical_constants
+
 
 _MAX_MATCHES = 20
 
@@ -97,14 +117,14 @@ def _unit_text(unit: str) -> str:
     if not unit:
         return ""
     try:
-        return format(_ureg.Unit(unit), "~").replace(" ", "")
+        return format(_ureg().Unit(unit), "~").replace(" ", "")
     except Exception:
         return unit
 
 
 def _describe(name: str) -> dict:
     """Build the public record for one entry of scipy.constants.physical_constants."""
-    value, unit, uncertainty = _PHYSICAL_CONSTANTS[name]
+    value, unit, uncertainty = _physical_constants()[name]
     return to_jsonable(
         {
             "name": name,
@@ -139,20 +159,21 @@ def physical_constant(query: str) -> dict:
         if not isinstance(query, str) or not query.strip():
             return err("physical_constant failed: query must be a non-empty string")
         text = query.strip()
+        constants = _physical_constants()
 
         alias_name = _lookup_alias(text)
-        if alias_name is not None and alias_name in _PHYSICAL_CONSTANTS:
+        if alias_name is not None and alias_name in constants:
             return ok(_describe(alias_name))
 
         lowered = text.lower()
-        exact = [name for name in _PHYSICAL_CONSTANTS if name.lower() == lowered]
+        exact = [name for name in constants if name.lower() == lowered]
         if len(exact) == 1:
             return ok(_describe(exact[0]))
 
         if exact:
             candidates = exact
         else:
-            candidates = [name for name in _PHYSICAL_CONSTANTS if lowered in name.lower()]
+            candidates = [name for name in constants if lowered in name.lower()]
 
         names = sorted(set(candidates), key=str.lower)[:_MAX_MATCHES]
         if not names:
@@ -174,7 +195,7 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> dict:
 
         # Quantity(value, unit) is required for offset units: value * ureg.degC
         # raises OffsetUnitCalculusError in pint.
-        converted = _ureg.Quantity(float(value), from_unit).to(to_unit)
+        converted = _ureg().Quantity(float(value), from_unit).to(to_unit)
         return ok(
             {
                 "value": float(converted.magnitude),
@@ -192,10 +213,11 @@ def unit_calculate(expression: str) -> dict:
         if not isinstance(expression, str) or not expression.strip():
             return err("unit_calculate failed: expression must be a non-empty string")
 
+        registry = _ureg()
         normalized = _group_division_denominators(expression)
-        result = _ureg.parse_expression(normalized)
+        result = registry.parse_expression(normalized)
 
-        if isinstance(result, _ureg.Quantity):
+        if isinstance(result, registry.Quantity):
             return ok(
                 {
                     "value": float(result.magnitude),

@@ -6,23 +6,24 @@ import csv
 import json
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-try:  # sympy is a project dependency, but core should stay importable without it
-    from sympy import Basic as _SympyBasic
-    from sympy import Float as _SympyFloat
-    from sympy import Integer as _SympyInteger
-    from sympy import Rational as _SympyRational
-except Exception:  # pragma: no cover - defensive only
-    _SympyBasic = None  # type: ignore[assignment]
-    _SympyFloat = None  # type: ignore[assignment]
-    _SympyInteger = None  # type: ignore[assignment]
-    _SympyRational = None  # type: ignore[assignment]
-
 _DEFAULT_OUTPUT_DIR = Path.home() / ".sci-mcp" / "outputs"
+
+
+def _sympy_module() -> Any:
+    """Return the sympy package if it is already imported, else ``None``.
+
+    sympy is a project dependency, but importing it here would add ~0.4s to
+    every server start for value conversion that most tool calls never need.
+    When sympy is absent from ``sys.modules`` no sympy object can have reached
+    these helpers, so the isinstance branches are correctly skipped.
+    """
+    return sys.modules.get("sympy")
 
 # Maximum size of a file referenced through load_array's "@<path>" syntax.
 _MAX_ARRAY_FILE_BYTES = 50 * 1024 * 1024
@@ -64,15 +65,16 @@ def to_jsonable(obj: Any) -> Any:
     if isinstance(obj, Path):
         return str(obj)
 
-    if _SympyBasic is not None and isinstance(obj, _SympyBasic):
+    sympy = _sympy_module()
+    if sympy is not None and isinstance(obj, sympy.Basic):
         # Check concrete numeric types before the generic str() fallback so that
         # callers can keep computing with the values. Integer must precede
         # Rational because sympy.Integer is a Rational subclass.
-        if _SympyInteger is not None and isinstance(obj, _SympyInteger):
+        if isinstance(obj, sympy.Integer):
             return int(obj)
-        if _SympyFloat is not None and isinstance(obj, _SympyFloat):
+        if isinstance(obj, sympy.Float):
             return to_jsonable(float(obj))
-        if _SympyRational is not None and isinstance(obj, _SympyRational):
+        if isinstance(obj, sympy.Rational):
             return float(obj)
         return str(obj)
 
@@ -156,7 +158,8 @@ def _sanitize(value: Any, path: str) -> tuple[Any, list[str]]:
             warnings.extend(item_warnings)
         return converted_items, warnings
 
-    if _SympyBasic is not None and isinstance(value, _SympyBasic):
+    sympy = _sympy_module()
+    if sympy is not None and isinstance(value, sympy.Basic):
         # Keep to_jsonable's sympy conversions (int/float/str), but record
         # non-finite concrete numbers (e.g. sympy.Float("nan") or sympy.oo).
         if getattr(value, "is_number", False):

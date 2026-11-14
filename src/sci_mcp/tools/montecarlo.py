@@ -7,19 +7,17 @@ import numbers
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
-import sympy as sp
-from scipy import stats
 
 from sci_mcp.core import err, ok, output_dir
 
+# matplotlib and sympy cost ~0.9s at import time. They are only needed when the
+# caller parses an expression or asks for a histogram, so pull them in lazily.
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import sympy as sp
 
 
 _N_MIN = 1
@@ -63,6 +61,9 @@ def _parse_variables(
     variables: Any,
 ) -> tuple[list[str], list[sp.Symbol], list[Any], list[dict[str, float]]]:
     """Resolve the variable mapping into symbols, scipy distributions and keyword params."""
+    import sympy as sp
+    from scipy import stats
+
     if not isinstance(variables, dict) or not variables:
         raise ValueError("variables must be a non-empty dict of name -> distribution spec")
 
@@ -126,6 +127,8 @@ def _evaluate_expression(
     n: int,
 ) -> np.ndarray:
     """Parse ``expression`` with sympy, lambdify it and evaluate it on the samples."""
+    import sympy as sp
+
     if not isinstance(expression, str) or not expression.strip():
         raise ValueError("expression must be a non-empty string")
 
@@ -274,6 +277,11 @@ def monte_carlo(
         if save_histogram:
             path = _resolve_histogram_path(filename)
             figure = None
+            import matplotlib
+
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+
             try:
                 figure, axes = plt.subplots(figsize=(6.4, 4.8))
                 axes.hist(evaluated, bins=_HIST_BINS)

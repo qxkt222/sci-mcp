@@ -16,14 +16,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
-from statsmodels.duration.hazard_regression import PHReg
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from ..core import err, load_array, ok, output_dir
 
+# pandas + statsmodels are only needed by ``cox_regression``; keeping them out
+# of the module import graph saves their startup cost.
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import pandas as pd
 
 
 _MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -148,6 +150,8 @@ def _formula_name(name: str) -> str:
 
 def _load_table(data: Any) -> pd.DataFrame:
     """Build a DataFrame from a ``{column: list}`` mapping or ``@<path>.csv``."""
+    import pandas as pd
+
     if isinstance(data, dict):
         if not data:
             raise ValueError("data must not be empty")
@@ -186,6 +190,8 @@ def _load_table(data: Any) -> pd.DataFrame:
 
 def _numeric_column(frame: pd.DataFrame, column: Any, role: str) -> np.ndarray:
     """Extract one column as a finite float array, raising on non-numeric data."""
+    import pandas as pd
+
     if not isinstance(column, str) or not column:
         raise ValueError(f"{role} must be a non-empty column name")
     if column not in frame.columns:
@@ -339,6 +345,9 @@ def cox_regression(
 
         covariate_formula = formula.strip()
         full_formula = f"{_formula_name(duration_col)} ~ {covariate_formula}"
+
+        from statsmodels.duration.hazard_regression import PHReg
+        from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
         model = PHReg.from_formula(
             full_formula, data=frame, status=event_col

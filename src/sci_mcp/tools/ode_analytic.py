@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
-
-from mcp.server.mcpserver import MCPServer
-from sympy import Derivative, Function, Subs, Symbol, dsolve, sympify
+from typing import TYPE_CHECKING
 
 from ..core import err, ok
+
+# sympy costs ~0.4s to import and is only needed once a tool is called.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.mcpserver import MCPServer
+    from sympy import Function, Symbol
 
 # Initial-condition keys use the compact form "y(0)", "y'(0)", "y''(0)".
 _ICS_KEY_PATTERN = re.compile(r"^\s*([A-Za-z_]\w*)\s*('*)\(([^()]*)\)\s*$")
@@ -15,6 +18,8 @@ _ICS_KEY_PATTERN = re.compile(r"^\s*([A-Za-z_]\w*)\s*('*)\(([^()]*)\)\s*$")
 
 def _equation_order(equation: object, y_func: Function, x_sym: Symbol) -> int:
     """Return the highest derivative order of ``y`` with respect to ``x``."""
+    from sympy import Derivative
+
     target = y_func(x_sym)
     highest = 0
     for derivative in getattr(equation, "atoms", lambda _cls: set())(Derivative):
@@ -33,6 +38,8 @@ def _parse_initial_conditions(
     ics: dict[str, float], y_func: Function, x_sym: Symbol
 ) -> dict:
     """Convert {"y(0)": 0, "y'(0)": 1} into sympy's dsolve ``ics`` mapping."""
+    from sympy import Derivative, Subs, sympify
+
     if not isinstance(ics, dict):
         raise TypeError("ics must be a dict mapping e.g. \"y(0)\" to a value")
 
@@ -77,6 +84,8 @@ def dsolve_ode(
 ) -> dict:
     """Solve an ODE analytically with sympy.dsolve, optionally with initial conditions."""
     try:
+        from sympy import Function, Symbol, dsolve, sympify
+
         y_func = Function(str(y))
         x_sym = Symbol(str(x))
         local_dict = {str(y): y_func, str(x): x_sym}

@@ -7,9 +7,10 @@ from typing import Any
 
 import numpy as np
 from mcp.server.mcpserver import MCPServer
-from scipy import signal as sp_signal
 
 from ..core import err, load_array, ok, output_dir
+
+# scipy.signal costs ~0.5s to import; it is loaded by the tools that use it.
 
 # BRIEF section 11: never return more than 2000 numeric points in one array.
 _MAX_POINTS = 2000
@@ -74,6 +75,8 @@ def filter_signal(
     lowpass/highpass take a scalar and bandpass/bandstop take ``[low, high]``.
     """
     try:
+        from scipy import signal as sp_signal
+
         if not isinstance(kind, str) or kind.strip().lower() not in _SUPPORTED_FILTER_KINDS:
             return err(
                 f"filter_signal failed: unknown kind {kind!r}; "
@@ -180,6 +183,8 @@ def power_spectrum(
 ) -> dict:
     """Estimate the power spectral density with Welch's method."""
     try:
+        from scipy import signal as sp_signal
+
         rate = _as_positive_rate(sample_rate)
         samples = _coerce_series(signal, "signal")
 
@@ -220,6 +225,8 @@ def find_peaks(
 ) -> dict:
     """Find local maxima in a signal, optionally filtered by height, distance or prominence."""
     try:
+        from scipy import signal as sp_signal
+
         samples = _coerce_series(signal, "signal")
 
         options: dict[str, Any] = {}
@@ -329,6 +336,8 @@ def stft(
     ``save_spectrogram`` additionally renders a PNG with matplotlib (Agg).
     """
     try:
+        from scipy import signal as sp_signal
+
         rate = _as_positive_rate(sample_rate)
         samples = _coerce_series(signal, "signal")
 

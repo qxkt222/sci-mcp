@@ -11,7 +11,10 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ..core import err, ok, output_dir
-from .stats_plot import describe, plot
+
+# ``stats_plot`` pulls in pandas + matplotlib (+ sympy via scipy); importing it at
+# module load costs ~1.5s of server startup for two rarely used tools. Resolve it
+# lazily inside the two call sites instead.
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
@@ -634,6 +637,8 @@ def describe_file(path: str, column: str | int | None = None) -> dict:
                 "describe_file failed: file has multiple columns; specify column by name or index"
             )
         selected, label = _select_column(array, columns, column)
+        from .stats_plot import describe
+
         described = describe(selected.tolist())
         if not described.get("ok"):
             return described
@@ -713,6 +718,8 @@ def plot_file(
             else:
                 values, _ = _select_column(array, columns, None)
                 data = {"values": values.tolist()}
+
+        from .stats_plot import plot
 
         rendered = plot(
             plot_kind,

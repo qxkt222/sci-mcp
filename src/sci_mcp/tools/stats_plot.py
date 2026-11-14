@@ -6,16 +6,12 @@ import numbers
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
-import sympy
-from scipy import optimize, stats
 
 from ..core import err, load_array, ok, output_dir
+
+# matplotlib + sympy are the two heaviest imports here (~0.7s combined) and are
+# only needed by ``curve_fit`` and ``plot``; import them lazily.
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
@@ -70,6 +66,8 @@ def _array_2d(data: dict[str, Any], key: str) -> np.ndarray:
 
 def describe(data: list[float] | str) -> dict:
     """Return descriptive statistics (mean, sample std, quartiles, skew, kurtosis) for a sample."""
+    from scipy import stats
+
     try:
         arr = _as_float_array(load_array(data), "data")
         if arr.ndim != 1:
@@ -106,6 +104,8 @@ def distribution(
     data: list[float] | str | None = None,
 ) -> dict:
     """Evaluate pdf/cdf/ppf/rvs or fit a scipy.stats distribution by attribute name."""
+    from scipy import stats
+
     try:
         data_arr = _as_float_array(load_array(data), "data") if data is not None else None
 
@@ -137,7 +137,7 @@ def distribution(
                 return err(f"distribution failed: operation {op!r} requires x")
             xarr = np.asarray(x, dtype=float)
             if xarr.ndim > 1:
-                return err(f"distribution failed: x must be a scalar or one-dimensional list")
+                return err("distribution failed: x must be a scalar or one-dimensional list")
             if op == "pdf":
                 values = density(xarr, **kwargs)
             elif op == "cdf":
@@ -192,6 +192,9 @@ def curve_fit(
     param_names: list[str] | None = None,
 ) -> dict:
     """Fit y = model(x) to data with scipy.optimize.curve_fit using a sympy-parsed expression."""
+    import sympy
+    from scipy import optimize
+
     try:
         if not isinstance(model, str) or not model.strip():
             return err("curve_fit failed: model must be a non-empty expression string")
@@ -340,6 +343,11 @@ def plot(
     dpi: int = 150,
 ) -> dict:
     """Render a line/scatter/hist/bar/errorbar/contour/surface plot to a PNG file."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     try:
         plot_kind = str(kind).strip().lower()
         if plot_kind not in _PLOT_KINDS:

@@ -14,14 +14,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
-import sympy
-from scipy.optimize import least_squares
 
 from ..core import err, ok, output_dir
 
+# pandas + sympy + scipy.optimize cost ~0.6s at import time; every use is inside
+# a tool body, so pull them in lazily.
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import pandas as pd
 
 
 _MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -59,6 +61,8 @@ def _resolve_input_path(raw: Any) -> Path:
 
 def _load_table(data: Any) -> pd.DataFrame:
     """Build a DataFrame from a ``{column: list}`` mapping or ``@<path>.csv``."""
+    import pandas as pd
+
     if isinstance(data, dict):
         if not data:
             raise ValueError("data must not be empty")
@@ -122,6 +126,8 @@ def _parse_initial(p0: Any) -> tuple[list[str], np.ndarray]:
 
 def _compile_model(model: Any, param_names: list[str]) -> Any:
     """Parse the model with sympy and return a numpy lambdified callable."""
+    import sympy
+
     if not isinstance(model, str) or not model.strip():
         raise ValueError("model must be a non-empty expression string")
     try:
@@ -314,6 +320,9 @@ def nonlinear_mixed_lm(
                 return err(
                     f"nonlinear_mixed_lm failed: column {column!r} not found in data"
                 )
+
+        import pandas as pd
+        from scipy.optimize import least_squares
 
         try:
             x_values = pd.to_numeric(frame[x], errors="raise").to_numpy(dtype=float)

@@ -11,29 +11,32 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
 
 from ..core import err, ok, output_dir
 
+# pandas + statsmodels cost ~1.2s at import time; both are pulled in lazily from
+# the two tools that need them so the MCP server starts faster.
+
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import pandas as pd
 
 
 _MAX_FILE_BYTES = 50 * 1024 * 1024
 _MAX_TABLE_ROWS = 1_000_000
 
-_FAMILIES: dict[str, Any] = {
-    "gaussian": sm.families.Gaussian,
-    "binomial": sm.families.Binomial,
-    "poisson": sm.families.Poisson,
+_FAMILIES: dict[str, str] = {
+    "gaussian": "Gaussian",
+    "binomial": "Binomial",
+    "poisson": "Poisson",
 }
 
-_COV_STRUCTURES: dict[str, Any] = {
-    "independence": sm.cov_struct.Independence,
-    "exchangeable": sm.cov_struct.Exchangeable,
-    "autoregressive": sm.cov_struct.Autoregressive,
+_COV_STRUCTURES: dict[str, str] = {
+    "independence": "Independence",
+    "exchangeable": "Exchangeable",
+    "autoregressive": "Autoregressive",
 }
 
 
@@ -61,6 +64,8 @@ def _resolve_input_path(raw: Any) -> Path:
 
 def _load_table(data: Any) -> pd.DataFrame:
     """Build a DataFrame from a ``{column: list}`` mapping or ``@<path>.csv``."""
+    import pandas as pd
+
     if isinstance(data, dict):
         if not data:
             raise ValueError("data must not be empty")
@@ -238,6 +243,8 @@ def mixed_lm(
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             try:
+                import statsmodels.formula.api as smf
+
                 result = smf.mixedlm(
                     formula,
                     data=frame,
@@ -326,23 +333,27 @@ def gee(
         if not isinstance(family, str):
             return err("gee failed: family must be a string")
         family_name = family.strip().lower()
-        family_class = _FAMILIES.get(family_name)
-        if family_class is None:
+        import statsmodels.api as sm
+
+        family_attr = _FAMILIES.get(family_name)
+        if family_attr is None:
             return err(
                 "gee failed: unknown family "
                 f"{family!r}; expected one of " + ", ".join(sorted(_FAMILIES))
             )
+        family_class = getattr(sm.families, family_attr)
 
         if not isinstance(cov_struct, str):
             return err("gee failed: cov_struct must be a string")
         cov_name = cov_struct.strip().lower()
-        cov_class = _COV_STRUCTURES.get(cov_name)
-        if cov_class is None:
+        cov_attr = _COV_STRUCTURES.get(cov_name)
+        if cov_attr is None:
             return err(
                 "gee failed: unknown cov_struct "
                 f"{cov_struct!r}; expected one of "
                 + ", ".join(sorted(_COV_STRUCTURES))
             )
+        cov_class = getattr(sm.cov_struct, cov_attr)
 
         frame = _load_table(data)
         if groups not in frame.columns:
@@ -352,6 +363,8 @@ def gee(
             # statsmodels emits a grid= FutureWarning for some covariance
             # structures; the fit itself is unaffected.
             warnings.simplefilter("ignore", FutureWarning)
+            import statsmodels.formula.api as smf
+
             result = smf.gee(
                 formula,
                 groups=groups,
@@ -369,6 +382,8 @@ def gee(
         if model_groups is None:
             group_count = int(frame[groups].nunique())
         else:
+            import pandas as pd
+
             group_count = int(len(pd.unique(np.asarray(model_groups).ravel())))
 
         return ok(

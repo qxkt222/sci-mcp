@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from mcp.server.mcpserver import MCPServer
-from sympy import Symbol, diff, expand, factor, integrate, limit, series, simplify, solve, sympify
+from ..core import err, ok
 
-from ..core import err, ok, to_jsonable
+# sympy costs ~0.4s to import and is only needed once a symbolic tool is called.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.mcpserver import MCPServer
 
 _SUPPORTED_OPERATIONS = ("diff", "integrate", "limit", "series", "simplify", "expand", "factor")
 
@@ -30,6 +31,18 @@ def symbolic_calculus(
 ) -> dict:
     """Perform symbolic calculus on an expression: diff, integrate, limit, series, simplify, expand, factor."""
     try:
+        from sympy import (
+            Symbol,
+            diff,
+            expand,
+            factor,
+            integrate,
+            limit,
+            series,
+            simplify,
+            sympify,
+        )
+
         expression = sympify(expr)
         var = Symbol(str(variable))
         op = str(operation).strip().lower()
@@ -64,6 +77,8 @@ def symbolic_calculus(
 def symbolic_solve(equations: list[str] | str, variables: list[str] | str) -> dict:
     """Solve one equation or a system of equations symbolically for the given variables."""
     try:
+        from sympy import Symbol, solve, sympify
+
         equation_list = _normalize_string_list(equations)
         variable_list = _normalize_string_list(variables)
 
@@ -126,6 +141,8 @@ def symbolic_evaluate(
 ) -> dict:
     """Substitute numeric or symbolic-constant values into an expression and evaluate it numerically."""
     try:
+        from sympy import Symbol, sympify
+
         expression = sympify(expr)
         if not isinstance(substitutions, dict):
             return err("symbolic_evaluate failed: substitutions must be a dict")

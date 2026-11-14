@@ -40,7 +40,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
-import sympy as sp
 from mcp.server.mcpserver import MCPServer
 
 from sci_mcp.core import err, ok, output_dir
@@ -104,6 +103,8 @@ def _int_param(value: Any, name: str, low: int, high: int) -> int:
 
 def _compile_expr(expression: Any, name: str) -> Callable[..., Any]:
     """Parse an expression in the symbols x and y and lambdify it for numpy."""
+    import sympy as sp  # imported here so module discovery does not pay for it
+
     if not isinstance(expression, str) or not expression.strip():
         raise ValueError(f"{name} must be a non-empty expression string")
     x, y = sp.symbols("x y")

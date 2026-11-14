@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
-from sympy import Symbol, diff, simplify, sympify
+from typing import TYPE_CHECKING
 
 from ..core import err, ok
+
+# sympy costs ~0.4s to import and is only needed once a tool is called.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.mcpserver import MCPServer
+    from sympy import Symbol
 
 
 def _parse_variables(variables: list[str]) -> list[Symbol]:
     """Validate a variable list and turn it into sympy symbols."""
+    from sympy import Symbol
+
     if isinstance(variables, str):
         raise TypeError("variables must be a list of variable names, not a single string")
     if not isinstance(variables, (list, tuple)):
@@ -21,6 +27,8 @@ def _parse_variables(variables: list[str]) -> list[Symbol]:
 
 def _parse_field(field: list[str]) -> list:
     """Validate a vector-field component list and parse each component."""
+    from sympy import sympify
+
     if isinstance(field, str):
         raise TypeError("field must be a list of expressions, not a single string")
     if not isinstance(field, (list, tuple)):
@@ -33,6 +41,8 @@ def _parse_field(field: list[str]) -> list:
 def gradient(expr: str, variables: list[str]) -> dict:
     """Compute the gradient of a scalar expression with respect to the given variables."""
     try:
+        from sympy import diff, simplify, sympify
+
         expression = sympify(str(expr))
         parsed_variables = _parse_variables(variables)
         components = [
@@ -51,6 +61,8 @@ def gradient(expr: str, variables: list[str]) -> dict:
 def divergence(field: list[str], variables: list[str]) -> dict:
     """Compute the divergence of a vector field with respect to the given variables."""
     try:
+        from sympy import diff, simplify
+
         parsed_field = _parse_field(field)
         parsed_variables = _parse_variables(variables)
 
@@ -72,6 +84,8 @@ def divergence(field: list[str], variables: list[str]) -> dict:
 def curl(field: list[str], variables: list[str]) -> dict:
     """Compute the curl of a 3-dimensional vector field."""
     try:
+        from sympy import diff, simplify
+
         parsed_field = _parse_field(field)
         parsed_variables = _parse_variables(variables)
 
@@ -96,6 +110,8 @@ def curl(field: list[str], variables: list[str]) -> dict:
 def laplacian(expr: str, variables: list[str]) -> dict:
     """Compute the Laplacian of a scalar expression as the sum of second derivatives."""
     try:
+        from sympy import diff, simplify, sympify
+
         expression = sympify(str(expr))
         parsed_variables = _parse_variables(variables)
         total = sum(diff(expression, variable, 2) for variable in parsed_variables)

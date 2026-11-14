@@ -7,21 +7,19 @@ import numbers
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from scipy import stats
 
 from ..core import err, load_array, ok, output_dir
 from .stats_inference import linear_regression
 from .stats_plot import plot as plot_tool
 
+# matplotlib, pandas and scipy.stats are the dominant import cost here and are
+# only touched by the profiling/forecast tools, so they load on first use.
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
+
+    import pandas as pd
 
 
 _MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -63,6 +61,8 @@ def _resolve_input_path(path: Any) -> Path:
 
 def _read_frame(path: Path) -> pd.DataFrame:
     """Read a CSV file with pandas while enforcing the row limit."""
+    import pandas as pd
+
     frame = pd.read_csv(path, nrows=_MAX_ROWS + 1)
     if len(frame) > _MAX_ROWS:
         raise ValueError(f"file has more than {_MAX_ROWS} rows")
@@ -71,6 +71,8 @@ def _read_frame(path: Path) -> pd.DataFrame:
 
 def _numeric_column_names(frame: pd.DataFrame) -> list[Any]:
     """Return the columns with a numeric dtype, excluding booleans."""
+    import pandas as pd
+
     names: list[Any] = []
     for name in frame.columns:
         series = frame[name]
@@ -93,6 +95,8 @@ def _non_numeric_column_names(frame: pd.DataFrame) -> list[Any]:
 
 def _column_summary(series: pd.Series) -> dict[str, Any]:
     """Return n/mean/std/min/max/median/q1/q3 for the finite values of a column."""
+    import pandas as pd
+
     values = pd.to_numeric(series, errors="coerce").to_numpy(dtype=float)
     values = values[np.isfinite(values)]
     n = int(values.size)
@@ -182,6 +186,8 @@ def _target_analysis(
     frame: pd.DataFrame, target_name: Any, numeric_columns: list[Any]
 ) -> dict[str, Any]:
     """Correlate numeric columns with the target and regress the target on them."""
+    import pandas as pd
+
     series = frame[target_name]
     is_numeric = (
         pd.api.types.is_numeric_dtype(series.dtype)
@@ -266,6 +272,11 @@ def _next_plot_path(prefix: str) -> Path:
 
 def _render_heatmap(columns: list[Any], matrix: np.ndarray) -> Path:
     """Render and save a correlation heatmap with matplotlib's Agg backend."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     path = _next_plot_path("correlation_heatmap")
     labels = [str(name) for name in columns]
     size = max(4.8, 0.6 * len(labels) + 2.0)
@@ -303,6 +314,8 @@ def _make_plots(
             # Plotting must never invalidate an otherwise successful analysis.
             pass
         return plots
+
+    import pandas as pd
 
     for name in columns:
         values = pd.to_numeric(frame[name], errors="coerce").to_numpy(dtype=float)
@@ -525,6 +538,7 @@ def forecast(
                 }
             )
         else:
+            from scipy import stats
             from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
             seasonal = "add" if period is not None else None

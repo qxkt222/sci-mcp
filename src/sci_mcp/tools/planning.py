@@ -6,9 +6,10 @@ import numbers
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy import optimize
 
 from sci_mcp.core import err, ok
+
+# scipy.optimize costs ~0.1s to import; it is loaded by the tools that use it.
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
@@ -146,6 +147,8 @@ def linear_program(
     bounds are scipy's ``(0, None)`` (all variables non-negative).
     """
     try:
+        from scipy import optimize
+
         objective = _as_vector(c, "c")
         n_vars = int(objective.size)
 
@@ -214,6 +217,8 @@ def integer_program(
     ``c`` to maximize. Default bounds are ``0 <= x <= inf``.
     """
     try:
+        from scipy import optimize
+
         objective = _as_vector(c, "c")
         n_vars = int(objective.size)
 

@@ -6,9 +6,10 @@ import numbers
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy import stats
 
 from ..core import err, load_array, ok
+
+# scipy.stats costs ~0.3s to import; it is loaded by the tools that use it.
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.mcpserver import MCPServer
@@ -44,6 +45,8 @@ def _check_sample(arr: np.ndarray, name: str, minimum: int = 2) -> None:
 
 def _t_and_p(estimate: float, standard_error: float, df: int) -> tuple[float, float]:
     """Return the t statistic and two-sided p value for an OLS coefficient."""
+    from scipy import stats
+
     if standard_error > 0.0:
         t_value = estimate / standard_error
         p_value = 2.0 * float(stats.t.sf(abs(t_value), df))
@@ -68,6 +71,8 @@ def t_test(
     Samples may be passed inline or as an ``"@<path>"`` file reference.
     """
     try:
+        from scipy import stats
+
         alt = str(alternative).strip().lower()
         if alt not in _ALTERNATIVES:
             return err(
@@ -127,6 +132,8 @@ def chi2_test(
 ) -> dict:
     """Run a chi-square goodness-of-fit test (1-D) or independence test (2-D table)."""
     try:
+        from scipy import stats
+
         raw = observed
         if isinstance(raw, np.ndarray):
             if raw.ndim not in (1, 2):
@@ -213,6 +220,8 @@ def anova(groups: list[list[float]]) -> dict:
     not supported for this parameter.
     """
     try:
+        from scipy import stats
+
         if not isinstance(groups, (list, tuple)) or len(groups) < 2:
             return err("anova failed: at least two groups are required")
 
@@ -256,6 +265,8 @@ def correlation(
     ``x`` and ``y`` may be passed inline or as ``"@<path>"`` file references.
     """
     try:
+        from scipy import stats
+
         name = str(method).strip().lower()
         if name not in _CORRELATION_METHODS:
             return err(
@@ -298,6 +309,8 @@ def linear_regression(
     a file for ``x`` may contain a one- or two-dimensional array.
     """
     try:
+        from scipy import stats
+
         x = load_array(x)
         yarr = load_array(y)
         if yarr.ndim != 1:
@@ -355,7 +368,7 @@ def linear_regression(
 
         try:
             design = np.asarray(list(x), dtype=float)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             return err(
                 "linear_regression failed: x must be a rectangular 2-D numeric array"
             )

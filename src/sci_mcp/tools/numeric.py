@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import sympy as sp
 from mcp.server.mcpserver import MCPServer
-from scipy import integrate, interpolate, optimize
 
 from ..core import load_array
 from sci_mcp.core import err, ok
+
+# sympy and scipy (~0.9s combined) are imported inside the tools that need them
+# so discovering this module does not pay for them at server startup.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    import sympy as sp
 
 # Tight tolerances so that the returned trajectory is close to machine precision
 # for well-conditioned problems (the scipy defaults, rtol=1e-3, are too coarse
@@ -37,6 +40,8 @@ _SUPPORTED_INTERP_KINDS = ("linear", "quadratic", "cubic")
 
 def _param_symbols(params: dict[str, float] | None) -> tuple[list[sp.Symbol], list[float]]:
     """Turn a JSON parameter dict into an ordered list of sympy symbols and float values."""
+    import sympy as sp
+
     if not params:
         return [], []
     symbols: list[sp.Symbol] = []
@@ -77,6 +82,9 @@ def solve_ode(
     variable is ``t``; keys of ``params`` are injected as extra constants.
     """
     try:
+        import sympy as sp
+        from scipy import integrate
+
         if isinstance(rhs, str):
             expressions = [rhs]
         elif isinstance(rhs, (list, tuple)):
@@ -205,6 +213,9 @@ def optimize_minimize(
     means ``expr >= 0`` and ``eq`` means ``expr == 0``.
     """
     try:
+        import sympy as sp
+        from scipy import optimize
+
         if not isinstance(x0, (list, tuple)) or len(x0) == 0:
             return err("optimize_minimize failed: x0 must be a non-empty list of numbers")
 
@@ -482,6 +493,9 @@ def find_roots(
 ) -> dict:
     """Find a scalar root of an expression using brentq (bracket) or Newton's method (x0)."""
     try:
+        import sympy as sp
+        from scipy import optimize
+
         if not isinstance(expr, str):
             return err("find_roots failed: expr must be a string")
         if not isinstance(variable, str) or not variable.isidentifier():
@@ -596,6 +610,8 @@ def interpolate_1d(
 ) -> dict:
     """Interpolate y(x) at points xi using scipy interp1d (linear/quadratic/cubic)."""
     try:
+        from scipy import interpolate
+
         if not isinstance(kind, str) or kind.lower() not in _SUPPORTED_INTERP_KINDS:
             return err(
                 f"interpolate_1d failed: unknown kind {kind!r}; "
@@ -685,6 +701,9 @@ def global_optimize(
     Keys of ``params`` are injected as additional symbolic constants.
     """
     try:
+        import sympy as sp
+        from scipy import optimize
+
         if not isinstance(method, str) or method not in _SUPPORTED_GLOBAL_METHODS:
             return err(
                 f"global_optimize failed: unknown method {method!r}; "
